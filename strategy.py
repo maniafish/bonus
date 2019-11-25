@@ -156,6 +156,12 @@ class SmallStg(object):
                     date, self.principal - temp_principal, temp_principal * 0.3, bet_round)
                 continue
 
+            # 当日止损策略(低于50%亏损不下注)
+            if self.principal <= temp_principal * 0.5:
+                print "loss of {0} = {1} > {2} stop bet today, bet_round = {3}".format(
+                    date, temp_principal - self.principal, temp_principal * 0.5, bet_round)
+                continue
+
             bet_round += 1
             self.do_bet(i, round_map)
 
