@@ -127,6 +127,10 @@ class SmallStg(object):
             print "do strategy failed"
             sys.exit(0)
 
+    def reset_factor(self):
+        """ 重设当日收益因子 """
+        pass
+
     def do(self, round_map):
         """ 执行定投策略 """
         # 设定当前收益因子
@@ -144,6 +148,7 @@ class SmallStg(object):
                 bet_round = 0
                 temp_date = date
                 temp_principal = self.principal
+                self.reset_factor()
 
             # 当日止盈策略(高于30%收益不下注)
             if self.principal >= temp_principal * 1.3:
@@ -229,6 +234,10 @@ class SmallOneThirdStg(SmallStg):
                 round_remain -= 1
 
             factor += 1
+
+    def reset_factor(self):
+        """ 重设当日收益因子 """
+        super(SmallOneThirdStg, self).set_factor_lower()
 
     def adjust_factor_list(self):
         """ sum_bet列表后移 """
