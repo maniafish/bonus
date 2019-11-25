@@ -1,0 +1,5 @@
+testout
+*.swp
+*.txt
+*.pyc
+*.DS_Store
