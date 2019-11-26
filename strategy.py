@@ -114,7 +114,7 @@ class SmallStg(object):
 
         bet = self.bet_multi[self.current_multi] * self.factor
         self.principal -= bet
-        if round_map[i]["single"] == round_map[i]["pre_single"] or round_map[i]["small"] == round_map[i]["pre_small"]:
+        if round_map[i]["single"] == round_map[i].get("pre_single", "") or round_map[i]["small"] == round_map[i].get("pre_small", ""):
             self.principal += bet * 1.96
             # 中了则重新定投
             self.current_multi = 0
@@ -129,7 +129,7 @@ class SmallStg(object):
 
     def reset_factor(self):
         """ 重设当日收益因子 """
-        pass
+        self.current_multi = 0
 
     def do(self, round_map):
         """ 执行定投策略 """
@@ -139,8 +139,9 @@ class SmallStg(object):
         temp_principal = self.principal
         bet_round = 0
         for i in sorted(round_map.keys()):
-            if not round_map[i].get("multi", None):
-                continue
+           # if not round_map[i].get("multi", None):
+           #     continue
+            round_map[i]["pre_small"] = str(i % 2)
 
             date = i / 1000
             if temp_date != date:
@@ -157,7 +158,7 @@ class SmallStg(object):
                 continue
 
             # 当日止损策略(低于30%亏损不下注)
-            if self.principal <= temp_principal * 0.3:
+            if self.principal <= temp_principal * 0.7:
                 print "loss of {0} = {1} > {2} stop bet today, bet_round = {3}".format(
                     date, temp_principal - self.principal, temp_principal * 0.3, bet_round)
                 continue
@@ -244,6 +245,7 @@ class SmallOneThirdStg(SmallStg):
     def reset_factor(self):
         """ 重设当日收益因子 """
         super(SmallOneThirdStg, self).set_factor_lower()
+        self.current_multi = 0
 
     def adjust_factor_list(self):
         """ sum_bet列表后移 """
