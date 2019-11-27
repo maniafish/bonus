@@ -99,22 +99,9 @@ class SmallStg(object):
 
     def do_bet(self, i, round_map):
         """ 执行一轮定投策略 """
-        # 一组定投开始前，调整收益因子
-        if self.current_multi == 0:
-            if self.factor_index + 1 >= len(self.factor_list):
-                # 可下注额超过sum_bet list的上限
-                self.adjust_factor_list()
-
-            if self.factor_list[self.factor_index] > self.principal / 2:
-                # sum_bet > 本金; 降低factor
-                self.set_factor_lower()
-            elif self.factor_list[self.factor_index + 1] < self.principal:
-                # 本金达到下个级别的可下注额
-                self.set_factor_higher()
-
         bet = self.bet_multi[self.current_multi] * self.factor
         self.principal -= bet
-        if round_map[i]["single"] == round_map[i].get("pre_single", "") or round_map[i]["small"] == round_map[i].get("pre_small", ""):
+        if round_map[i]["single"] == round_map[i].get("pre_single", "--") or round_map[i]["small"] == round_map[i].get("pre_small", "--"):
             self.principal += bet * 1.96
             # 中了则重新定投
             self.current_multi = 0
@@ -122,7 +109,10 @@ class SmallStg(object):
             # 没中则执行下一定投倍率
             self.current_multi = (self.current_multi + 1) % self.count
 
-        print "{0}: bet {1}, principal {2}".format(i, bet, self.principal)
+        print "{0}: actual {1}{2}, pre {3}{4}, bet {5}, principal {6}".format(
+            i, round_map[i]["single"], round_map[i]["small"],
+            round_map[i].get("pre_single", "--"), round_map[i].get("pre_small", "--"),
+            bet, self.principal)
         if self.principal < 0:
             print "do strategy failed"
             sys.exit(0)
@@ -130,6 +120,16 @@ class SmallStg(object):
     def reset_factor(self):
         """ 重设当日收益因子 """
         self.current_multi = 0
+        if self.factor_index + 1 >= len(self.factor_list):
+            # 可下注额超过sum_bet list的上限
+            self.adjust_factor_list()
+
+        if self.factor_list[self.factor_index] > self.principal / 2:
+            # sum_bet > 本金; 降低factor
+            self.set_factor_lower()
+        elif self.factor_list[self.factor_index + 1] < self.principal:
+            # 本金达到下个级别的可下注额
+            self.set_factor_higher()
 
     def do(self, round_map):
         """ 执行定投策略 """
@@ -139,9 +139,8 @@ class SmallStg(object):
         temp_principal = self.principal
         bet_round = 0
         for i in sorted(round_map.keys()):
-           # if not round_map[i].get("multi", None):
-           #     continue
-            round_map[i]["pre_small"] = str(i % 2)
+            if not round_map[i].get("multi", None):
+                continue
 
             date = i / 1000
             if temp_date != date:
@@ -188,11 +187,11 @@ class SmallFixStg(SmallStg):
     """
     def set_bet_multi(self):
         """ 设定每轮定投倍率 """
-        self.bet_multi = []
-        sum_multi = 0
-        for i in range(0, self.count):
+        self.bet_multi = [1]
+        sum_multi = 1
+        for i in range(1, self.count):
             index = i + 1
-            bet = math.ceil((sum_multi + index)/0.9)
+            bet = (sum_multi + index)/0.96
             self.bet_multi.append(bet)
             sum_multi += bet
 
@@ -203,73 +202,26 @@ class YfStg(SmallStg):
         self.bet_multi = [1, 3, 8, 24, 72, 216]
 
 
-class SmallOneThirdStg(SmallStg):
+class SmallOneThirdStg(SmallFixStg):
     """ 总轮次1/3定投策略 """
     def __init__(self, principal, count):
         super(SmallOneThirdStg, self).__init__(principal, count)
         self.count = count/3
 
-    def set_factor(self):
-        """ 设定收益因子 """
-        if not self.principal:
-            print "no principal"
-            sys.exit(1)
-
-        # 达到本金上限后，额外计算round_remain轮定投sum
-        round_remain = 100
-        factor = self.factor
-        set_factor_flag = True
-        while True:
-            if round_remain <= 0:
-                print "factor: {0}, sum_bet: {1}".format(
-                    self.factor, self.factor_list[self.factor_index])
-                return
-
-            sum_bet = 3 * self.round_bonus(factor)
-            self.factor_list.append(sum_bet)
-            if sum_bet > self.principal / 2:
-                if set_factor_flag:
-                    self.factor = factor - 1
-                    # 当前factor 对应factor_list的游标
-                    self.factor_index = len(self.factor_list) - 2
-                    if self.factor < 1:
-                        print "invalid principal: {0}".format(self.principal)
-                        sys.exit(1)
-
-                    set_factor_flag = False
-
-                round_remain -= 1
-
-            factor += 1
-
-    def reset_factor(self):
-        """ 重设当日收益因子 """
-        super(SmallOneThirdStg, self).set_factor_lower()
-        self.current_multi = 0
-
-    def adjust_factor_list(self):
-        """ sum_bet列表后移 """
-        l = len(self.factor_list)
-        # 取后100个元素
-        self.factor_list = self.factor_list[l-100:l]
-        self.factor_index = 99
-        factor = self.factor
-        # 增加100个元素
-        for i in range(0, 100):
-            self.factor_list.append(3 * self.round_bonus(factor))
-            factor += 1
-
-    def set_factor_lower(self):
-        """ 收益因子降档 """
-        while self.factor_list[self.factor_index] > self.principal:
-            if self.factor_index - 1 < 0:
+    def round_bonus(self, factor):
+        """ 模拟一组完整定投的收益 """
+        sum_bet = 0
+        bet = 0
+        for i, m in enumerate(self.bet_multi):
+            if i >= self.count:
                 break
 
-            self.factor_index -= 1
-            self.factor -= 1
+            bet = m * factor
+            sum_bet += bet
+            print "round {0}: bet {1}, sum {2}, bonus: {3}".format(
+                i+1, bet, sum_bet, 1.96*bet-sum_bet)
 
-        print "set factor lower to {0}, sum_bet: {1}".format(
-            self.factor, self.factor_list[self.factor_index])
+        return 3 * sum_bet
 
 
 class YfHalfStg(YfStg):

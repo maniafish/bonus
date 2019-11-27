@@ -5,6 +5,7 @@ import re
 import traceback
 from datetime import datetime
 import strategy
+import os
 
 stg_map = {
     "1": "SmallStg",
@@ -28,7 +29,7 @@ class Round(object):
         for fileline in open("simulate_input.txt"):
             filename = fileline.strip()
             i = 0
-            for line in open(filename):
+            for line in open(os.path.join("datafile", filename)):
                 try:
                     keys = re.split('\t| *', line.rstrip())
                     if i % 2 == 0:
